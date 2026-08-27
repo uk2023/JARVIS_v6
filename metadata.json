@@ -1,0 +1,6 @@
+{
+  "name": "JARVIS Cognitive OS",
+  "description": "Autonomous modular cognitive organism with pulsating soul, FAISS vector memory, semantic knowledge graph, typo-tolerant Hinglish retrieval, and offline Qwen 3B neural bridge.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
