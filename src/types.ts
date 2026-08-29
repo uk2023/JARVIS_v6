@@ -35,6 +35,8 @@ export interface CognitiveTrace {
   typosCorrected?: Array<{ raw: string; corrected: string }>;
 }
 
+export type AppTheme = 'dark' | 'light';
+
 export interface ChatSession {
   sessionId: string;
   title: string;
@@ -44,6 +46,8 @@ export interface ChatSession {
   msgCount: number;
   category: 'Today' | 'Previous';
 }
+
+export type SessionItem = ChatSession;
 
 export interface EngramFact {
   id: string;
@@ -104,7 +108,6 @@ export interface EvolutionProposal {
 }
 
 export type ActiveTab = 'chat' | 'matrix' | 'memory' | 'autonomy' | 'code';
-export type SessionItem = ChatSession;
 
 export interface OrganismTelemetry {
   pulseState: string;

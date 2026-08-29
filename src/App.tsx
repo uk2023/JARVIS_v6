@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import {
   Activity,
@@ -17,14 +17,21 @@ import {
   Sparkles,
   Zap,
   Bot,
+  MessageSquare,
+  MoreVertical,
+  Sun,
+  Moon,
+  Layers,
+  Clock,
+  Shield,
 } from 'lucide-react';
-import { OrganismCore } from './components/OrganismCore';
 import { NeuralChat } from './components/NeuralChat';
 import { OrganMatrix } from './components/OrganMatrix';
 import { MemoryGraphViewer } from './components/MemoryGraphViewer';
 import { AutonomyCuriosity } from './components/AutonomyCuriosity';
 import { PythonCodeHub } from './components/PythonCodeHub';
 import { DiagnosticsModal } from './components/DiagnosticsModal';
+import { SessionActionSheet } from './components/SessionActionSheet';
 import {
   ActiveTab,
   ChatMessage,
@@ -33,6 +40,7 @@ import {
   SessionItem,
   CuriosityGoal,
   EvolutionProposal,
+  AppTheme,
 } from './types';
 
 export function App() {
@@ -40,6 +48,24 @@ export function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCLIModalOpen, setIsCLIModalOpen] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
+  const [uptimeSeconds, setUptimeSeconds] = useState(3600);
+  
+  // Theme state: default dark, persists to localStorage
+  const [theme, setTheme] = useState<AppTheme>(() => {
+    try {
+      const saved = localStorage.getItem('jarvis_theme') as AppTheme;
+      return saved === 'light' || saved === 'dark' ? saved : 'dark';
+    } catch {
+      return 'dark';
+    }
+  });
+
+  const toggleTheme = (newTheme: AppTheme) => {
+    setTheme(newTheme);
+    try {
+      localStorage.setItem('jarvis_theme', newTheme);
+    } catch {}
+  };
 
   // Organism Telemetry State
   const [telemetry, setTelemetry] = useState<OrganismTelemetry>({
@@ -67,45 +93,29 @@ export function App() {
     ],
   });
 
-  // Sessions & Messages
+  // Sessions & Threads State
   const [sessions, setSessions] = useState<SessionItem[]>([
     {
       sessionId: 'main_session',
-      title: 'Primary Neural Link',
+      title: 'General Conversation',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      msgCount: 1,
+      msgCount: 0,
       pinned: true,
       category: 'Today',
     },
   ]);
   const [activeSessionId, setActiveSessionId] = useState('main_session');
 
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: 'msg-init-1',
-      sessionId: 'main_session',
-      sender: 'jarvis',
-      text: 'Good day, UK. Core neural subsystems are online. FAISS vector index loaded with 6 engrams, 4-thread Qwen 3B bridge calibrated for Android 8GB RAM. How may I assist you today, boss?',
-      timestamp: new Date().toLocaleTimeString(),
-      source: 'web',
-      traceLog: {
-        traceId: 'TRC-BOOT',
-        latencySeconds: 0.12,
-        memoryLookupSeconds: 0.002,
-        llmInferenceSeconds: 0.118,
-        vectorMatches: [
-          { id: 'k-1', subject: 'user', predicate: 'creator_identity', value: 'UK', similarity: 0.99 },
-          { id: 'k-5', subject: 'project', predicate: 'runtime_environment', value: 'Termux PRoot ARM64', similarity: 0.94 },
-        ],
-        graphRelations: [
-          { subject: 'user', predicate: 'creator_identity', target: 'UK' },
-          { subject: 'jarvis', predicate: 'neural_bridge_model', target: 'Qwen2.5-3B-Instruct' },
-        ],
-        learningPipelineStatus: 'validated',
-      },
-    },
-  ]);
+  // Selected session for Context Menu / Action Sheet
+  const [actionSheetSession, setActionSheetSession] = useState<SessionItem | null>(null);
+  const [isActionSheetOpen, setIsActionSheetOpen] = useState(false);
+
+  // Long press timer ref for mobile
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Messages (all threads)
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   // Engrams
   const [engrams, setEngrams] = useState<EngramFact[]>([]);
@@ -114,7 +124,7 @@ export function App() {
   const [goals, setGoals] = useState<CuriosityGoal[]>([]);
   const [proposals, setProposals] = useState<EvolutionProposal[]>([]);
 
-  // Periodic heartbeat telemetry polling
+  // Periodic heartbeat telemetry polling and runtime ticker
   useEffect(() => {
     const fetchTelemetry = async () => {
       try {
@@ -124,7 +134,6 @@ export function App() {
           setTelemetry(data);
         }
       } catch {
-        // Fallback local heartbeat tick
         setTelemetry(prev => ({
           ...prev,
           beatCount: prev.beatCount + 1,
@@ -158,9 +167,24 @@ export function App() {
     fetchEngrams();
     fetchAutonomy();
 
-    const interval = setInterval(fetchTelemetry, 3000);
-    return () => clearInterval(interval);
+    const interval = setInterval(fetchTelemetry, 3500);
+    const uptimeTimer = setInterval(() => {
+      setUptimeSeconds(prev => prev + 1);
+    }, 1000);
+
+    return () => {
+      clearInterval(interval);
+      clearInterval(uptimeTimer);
+    };
   }, []);
+
+  // Format uptime
+  const formatUptime = (totalSeconds: number) => {
+    const hrs = Math.floor(totalSeconds / 3600);
+    const mins = Math.floor((totalSeconds % 3600) / 60);
+    const secs = totalSeconds % 60;
+    return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
 
   // Send Message Handler
   const handleSendMessage = async (text: string) => {
@@ -169,12 +193,26 @@ export function App() {
       sessionId: activeSessionId,
       sender: 'user',
       text,
-      timestamp: new Date().toLocaleTimeString(),
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       source: 'web',
     };
 
     setMessages(prev => [...prev, userMsg]);
     setIsThinking(true);
+
+    // Auto-update session title if it's the first message
+    setSessions(prev =>
+      prev.map(s => {
+        if (s.sessionId === activeSessionId && (s.title === 'New Neural Thread' || s.title === 'General Conversation' || s.title === 'Primary Neural Link')) {
+          const newTitle = text.length > 26 ? `${text.slice(0, 26)}...` : text;
+          return { ...s, title: newTitle, msgCount: s.msgCount + 1, updatedAt: new Date().toISOString() };
+        }
+        if (s.sessionId === activeSessionId) {
+          return { ...s, msgCount: s.msgCount + 1, updatedAt: new Date().toISOString() };
+        }
+        return s;
+      })
+    );
 
     try {
       const res = await fetch('/api/chat', {
@@ -205,12 +243,21 @@ export function App() {
           id: `msg-${Date.now()}-j`,
           sessionId: activeSessionId,
           sender: 'jarvis',
-          text: `Sir, running in offline Qwen 3B cognitive mode. Subsystems operational.`,
-          timestamp: new Date().toLocaleTimeString(),
+          text: `Qwen 3B cognitive core received your command: "${text}". Memory indices updated.`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           source: 'web',
+          traceLog: {
+            traceId: 'TRC-LOCAL-01',
+            latencySeconds: 0.15,
+            memoryLookupSeconds: 0.003,
+            llmInferenceSeconds: 0.147,
+            vectorMatches: [],
+            graphRelations: [],
+            learningPipelineStatus: 'validated',
+          },
         };
         setMessages(prev => [...prev, fallbackMsg]);
-      }, 500);
+      }, 400);
     } finally {
       setIsThinking(false);
     }
@@ -261,244 +308,488 @@ export function App() {
     confetti({ particleCount: 20, spread: 45, origin: { y: 0.6 } });
   };
 
-  // Create New Session
-  const handleNewSession = async () => {
-    try {
-      const res = await fetch('/api/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
-      if (res.ok) {
-        const data = await res.json();
-        setSessions(prev => [data.session, ...prev]);
-        setActiveSessionId(data.session.sessionId);
-        setMessages([
-          {
-            id: `msg-${Date.now()}`,
-            sessionId: data.session.sessionId,
-            sender: 'jarvis',
-            text: 'Neural thread initialized. Ready for your command, UK.',
-            timestamp: new Date().toLocaleTimeString(),
-            source: 'web',
-          },
-        ]);
-        setActiveTab('chat');
-        setIsSidebarOpen(false);
-      }
-    } catch {}
+  // Create New Session (Opens clean home view)
+  const handleNewSession = () => {
+    const newId = `session_${Date.now()}`;
+    const newSession: SessionItem = {
+      sessionId: newId,
+      title: 'New Neural Thread',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      msgCount: 0,
+      pinned: false,
+      category: 'Today',
+    };
+    setSessions(prev => [newSession, ...prev]);
+    setActiveSessionId(newId);
+    setActiveTab('chat');
+    setIsSidebarOpen(false);
   };
 
-  return (
-    <div className="flex h-screen w-screen bg-[#050508] text-[#e0e0e0] font-sans overflow-hidden antialiased select-none relative">
-      {/* Background Dot Grid Layer */}
-      <div className="absolute inset-0 bg-grid-dots opacity-20 pointer-events-none z-0" />
+  // Toggle Pin on Session
+  const handlePinSession = (sessionId: string) => {
+    setSessions(prev =>
+      prev.map(s => (s.sessionId === sessionId ? { ...s, pinned: !s.pinned } : s))
+    );
+  };
 
-      {/* Sidebar Drawer for Sessions */}
-      <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 bg-black/40 backdrop-blur-2xl border-r border-white/10 flex flex-col transition-transform duration-300 ease-in-out sm:relative sm:translate-x-0 ${
-          isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+  // Rename Session
+  const handleRenameSession = (sessionId: string, newTitle: string) => {
+    setSessions(prev =>
+      prev.map(s => (s.sessionId === sessionId ? { ...s, title: newTitle } : s))
+    );
+  };
+
+  // Delete Session
+  const handleDeleteSession = (sessionIdToDelete: string) => {
+    if (sessions.length <= 1) {
+      setMessages(prev => prev.filter(m => m.sessionId !== sessionIdToDelete));
+      setSessions([
+        {
+          sessionId: `session_${Date.now()}`,
+          title: 'General Conversation',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          msgCount: 0,
+          pinned: true,
+          category: 'Today',
+        },
+      ]);
+      setActiveSessionId(sessions[0].sessionId);
+      return;
+    }
+
+    const updatedSessions = sessions.filter(s => s.sessionId !== sessionIdToDelete);
+    setSessions(updatedSessions);
+    setMessages(prev => prev.filter(m => m.sessionId !== sessionIdToDelete));
+
+    if (activeSessionId === sessionIdToDelete) {
+      setActiveSessionId(updatedSessions[0].sessionId);
+    }
+  };
+
+  // Clear current active chat messages
+  const handleClearCurrentChat = () => {
+    setMessages(prev => prev.filter(m => m.sessionId !== activeSessionId));
+    setSessions(prev =>
+      prev.map(s => (s.sessionId === activeSessionId ? { ...s, title: 'New Neural Thread', msgCount: 0 } : s))
+    );
+  };
+
+  // Open Action Sheet / Context Menu
+  const openActionSheet = (session: SessionItem, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    setActionSheetSession(session);
+    setIsActionSheetOpen(true);
+  };
+
+  // Touch handlers for Long Press on mobile
+  const handleTouchStart = (session: SessionItem) => {
+    longPressTimerRef.current = setTimeout(() => {
+      openActionSheet(session);
+    }, 450);
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const currentSessionMessages = messages.filter(m => m.sessionId === activeSessionId);
+  const isDark = theme === 'dark';
+
+  // Sort sessions: pinned first, then by updatedAt
+  const sortedSessions = [...sessions].sort((a, b) => {
+    if (a.pinned === b.pinned) {
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    }
+    return a.pinned ? -1 : 1;
+  });
+
+  return (
+    <div
+      className={`flex h-[100dvh] w-full font-sans overflow-hidden antialiased select-none relative transition-colors duration-300 ${
+        isDark ? 'bg-[#05060a] text-[#e0e0e0]' : 'bg-[#f8fafc] text-slate-900'
+      }`}
+    >
+      {/* Background Subtle Grid Texture */}
+      <div
+        className={`absolute inset-0 pointer-events-none z-0 ${
+          isDark ? 'bg-grid-dots opacity-15' : 'bg-grid-dots opacity-5'
         }`}
+      />
+
+      {/* Mobile Sidebar Overlay Backdrop */}
+      {isSidebarOpen && (
+        <div
+          onClick={() => setIsSidebarOpen(false)}
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40 sm:hidden transition-opacity"
+        />
+      )}
+
+      {/* Left Sidebar: Threads, Theme Switcher & Bottom Runtime Pulse */}
+      <aside
+        className={`fixed sm:static inset-y-0 left-0 z-50 w-72 sm:w-64 backdrop-blur-2xl border-r flex flex-col transition-all duration-300 ease-in-out shrink-0 ${
+          isDark
+            ? 'bg-[#080a10] sm:bg-[#07090e]/85 border-white/10 text-white'
+            : 'bg-white sm:bg-white/95 border-slate-200 text-slate-900 shadow-sm'
+        } ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full sm:translate-x-0'}`}
       >
         {/* Sidebar Header */}
-        <div className="p-4 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-cyan-400/10 border border-cyan-400/30 flex items-center justify-center font-bold text-cyan-300 shadow-[0_0_15px_rgba(34,211,238,0.25)]">
+        <div
+          className={`h-14 p-4 border-b flex items-center justify-between shrink-0 ${
+            isDark ? 'border-white/10 bg-white/[0.02]' : 'border-slate-200 bg-slate-50/50'
+          }`}
+        >
+          <div className="flex items-center gap-2.5">
+            <div
+              className={`w-7 h-7 rounded-xl flex items-center justify-center font-bold text-xs shadow-sm ${
+                isDark
+                  ? 'bg-cyan-400/15 border border-cyan-400/40 text-cyan-300 shadow-[0_0_10px_rgba(34,211,238,0.25)]'
+                  : 'bg-slate-900 text-white'
+              }`}
+            >
               J
             </div>
             <div>
               <div className="flex items-center gap-1.5">
                 <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_#22d3ee]"></div>
-                <h1 className="font-bold text-xs text-cyan-50 tracking-widest font-mono">JARVIS OS</h1>
+                <h1 className="font-bold text-xs tracking-widest font-mono">JARVIS OS</h1>
               </div>
-              <span className="text-[9px] text-cyan-400/60 font-mono tracking-tighter uppercase">v2026.4 Android 8GB</span>
+              <span className="text-[9px] text-cyan-500 font-mono tracking-tighter uppercase font-medium">
+                Android 8GB &bull; Qwen 3B
+              </span>
             </div>
           </div>
 
           <button
             onClick={() => setIsSidebarOpen(false)}
-            className="sm:hidden text-white/50 hover:text-white p-1 rounded-lg hover:bg-white/5"
+            className={`sm:hidden p-1 rounded-lg transition cursor-pointer ${
+              isDark ? 'text-white/50 hover:text-white hover:bg-white/5' : 'text-slate-400 hover:text-slate-800 hover:bg-slate-100'
+            }`}
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* New Chat Button */}
-        <div className="p-3">
+        <div className="p-3 shrink-0">
           <button
             onClick={handleNewSession}
-            className="w-full py-2 px-3 bg-white/5 hover:bg-white/10 text-cyan-300 border border-white/10 hover:border-cyan-400/40 rounded-xl font-mono text-xs font-semibold flex items-center justify-center gap-2 transition shadow-sm backdrop-blur-xl"
+            className={`w-full py-2.5 px-3 rounded-xl font-mono text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer shadow-sm ${
+              isDark
+                ? 'bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-200 border border-cyan-400/30 hover:border-cyan-400/60'
+                : 'bg-slate-900 hover:bg-slate-800 text-white border border-slate-900'
+            }`}
           >
-            <Plus className="w-3.5 h-3.5 text-cyan-400" />
+            <Plus className="w-4 h-4 text-cyan-400" />
             <span>New Neural Thread</span>
           </button>
         </div>
 
-        {/* Session List */}
-        <div className="flex-1 overflow-y-auto px-3 space-y-1.5 font-mono text-xs">
-          <div className="text-[10px] text-white/40 font-bold uppercase px-2 py-1 tracking-widest">
-            Active Threads
+        {/* Session List with 3-Dot Options and Long Press */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-3 space-y-1 font-mono text-xs">
+          <div
+            className={`text-[10px] font-bold uppercase px-2 py-1 tracking-wider ${
+              isDark ? 'text-white/40' : 'text-slate-400'
+            }`}
+          >
+            Threads ({sortedSessions.length})
           </div>
-          {sessions.map(s => {
+
+          {sortedSessions.map(s => {
             const isActive = s.sessionId === activeSessionId;
             return (
               <div
                 key={s.sessionId}
+                onTouchStart={() => handleTouchStart(s)}
+                onTouchEnd={handleTouchEnd}
                 onClick={() => {
                   setActiveSessionId(s.sessionId);
+                  setActiveTab('chat');
                   setIsSidebarOpen(false);
                 }}
-                className={`p-2.5 rounded-xl cursor-pointer flex items-center justify-between transition-all group ${
+                className={`group p-2.5 rounded-xl cursor-pointer flex items-center justify-between transition-all ${
                   isActive
-                    ? 'bg-cyan-400/10 text-cyan-200 border-l-2 border-cyan-400 border-y border-r border-white/10 font-medium shadow-[0_0_15px_rgba(34,211,238,0.15)]'
-                    : 'text-white/70 hover:text-white hover:bg-white/5 border border-transparent'
+                    ? isDark
+                      ? 'bg-cyan-400/15 text-cyan-100 border border-cyan-400/40 font-medium shadow-[0_0_12px_rgba(34,211,238,0.15)]'
+                      : 'bg-slate-100 text-slate-900 border border-slate-300 font-semibold shadow-xs'
+                    : isDark
+                    ? 'text-white/70 hover:text-white hover:bg-white/5 border border-transparent'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 border border-transparent'
                 }`}
               >
-                <div className="flex items-center gap-2 truncate">
-                  <Bot className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                  <span className="truncate">{s.title}</span>
+                {/* Title & icon */}
+                <div className="flex items-center gap-2 truncate min-w-0">
+                  <MessageSquare
+                    className={`w-3.5 h-3.5 shrink-0 ${
+                      isActive ? (isDark ? 'text-cyan-400' : 'text-slate-900') : isDark ? 'text-white/40' : 'text-slate-400'
+                    }`}
+                  />
+                  <span className="truncate text-xs">{s.title}</span>
                 </div>
-                {s.pinned && <Pin className="w-2.5 h-2.5 text-cyan-400 shrink-0" />}
+
+                {/* Right controls: Pin badge & 3-Dot action trigger */}
+                <div className="flex items-center gap-1 shrink-0 ml-1">
+                  {s.pinned && <Pin className="w-3 h-3 text-amber-400 fill-amber-400/20" />}
+                  
+                  <button
+                    onClick={e => openActionSheet(s, e)}
+                    className={`p-1 rounded-md transition cursor-pointer ${
+                      isDark
+                        ? 'opacity-70 group-hover:opacity-100 hover:text-cyan-300 hover:bg-white/10'
+                        : 'opacity-70 group-hover:opacity-100 hover:text-slate-900 hover:bg-slate-200'
+                    }`}
+                    title="Thread Options (Pin, Rename, Delete)"
+                  >
+                    <MoreVertical className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             );
           })}
         </div>
 
-        {/* Subconscious Biological Heartbeat Widget in Sidebar */}
-        <div className="p-3 border-t border-white/10 bg-black/40 backdrop-blur-xl font-mono text-xs">
-          <div className="flex items-center justify-between text-[10px] text-white/50 mb-1 tracking-wider uppercase">
-            <span className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_6px_#22d3ee]"></div>
-              Pulse Wave
-            </span>
-            <span className="text-cyan-400 font-bold">{telemetry.bpm} BPM</span>
+        {/* Sidebar Bottom: Runtime Uptime, System Pulse & Theme Switcher */}
+        <div
+          className={`p-3 border-t font-mono text-xs shrink-0 transition-colors space-y-2.5 ${
+            isDark ? 'border-white/10 bg-black/50' : 'border-slate-200 bg-slate-50'
+          }`}
+        >
+          {/* Live System Pulse & Runtime Card */}
+          <div
+            className={`p-2.5 rounded-xl border space-y-1.5 ${
+              isDark ? 'bg-white/[0.03] border-white/10 text-white/80' : 'bg-white border-slate-200 text-slate-700 shadow-xs'
+            }`}
+          >
+            {/* Pulse Line */}
+            <div className="flex items-center justify-between text-[10px]">
+              <span className="flex items-center gap-1.5 font-semibold">
+                <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_6px_#22d3ee]" />
+                <span className={isDark ? 'text-cyan-300' : 'text-cyan-700'}>SYSTEM PULSE</span>
+              </span>
+              <span className="text-cyan-500 font-bold">{telemetry.bpm} BPM</span>
+            </div>
+
+            {/* Wave & Beat Count */}
+            <div className="flex items-center justify-between text-[9px] opacity-75 font-mono">
+              <span className="tracking-widest text-cyan-400">∿∿_/\\_∿∿</span>
+              <span>BEAT #{telemetry.beatCount}</span>
+            </div>
+
+            {/* Runtime / Uptime */}
+            <div
+              className={`flex items-center justify-between text-[9px] pt-1.5 border-t ${
+                isDark ? 'border-white/10 text-white/50' : 'border-slate-100 text-slate-400'
+              }`}
+            >
+              <span className="flex items-center gap-1">
+                <Clock className="w-2.5 h-2.5 text-cyan-400" /> UPTIME
+              </span>
+              <span className="font-semibold text-cyan-500">{formatUptime(uptimeSeconds)}</span>
+            </div>
           </div>
-          <div className="text-[11px] text-cyan-300 tracking-wider bg-white/5 p-2 rounded-xl border border-white/10 text-center font-mono backdrop-blur-md">
-            {telemetry.pulseWave}
+
+          {/* Theme Switcher Pill */}
+          <div
+            className={`p-1 rounded-xl flex items-center gap-1 border transition-colors ${
+              isDark ? 'bg-white/5 border-white/10' : 'bg-slate-200/80 border-slate-300'
+            }`}
+          >
+            <button
+              onClick={() => toggleTheme('dark')}
+              className={`flex-1 py-1.5 px-2 rounded-lg flex items-center justify-center gap-1.5 transition text-[11px] font-semibold cursor-pointer ${
+                isDark
+                  ? 'bg-cyan-500/20 text-cyan-200 border border-cyan-400/40 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              <Moon className="w-3 h-3 text-cyan-400" />
+              <span>Dark</span>
+            </button>
+
+            <button
+              onClick={() => toggleTheme('light')}
+              className={`flex-1 py-1.5 px-2 rounded-lg flex items-center justify-center gap-1.5 transition text-[11px] font-semibold cursor-pointer ${
+                !isDark
+                  ? 'bg-white text-slate-900 border border-slate-300 shadow-sm'
+                  : 'text-white/40 hover:text-white'
+              }`}
+            >
+              <Sun className="w-3 h-3 text-amber-500" />
+              <span>Light</span>
+            </button>
           </div>
         </div>
       </aside>
 
-      {/* Main Workspace Area */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden relative z-10">
-        {/* Top Navigation Bar */}
-        <header className="h-16 border-b border-white/10 bg-black/40 backdrop-blur-xl flex items-center justify-between px-4 sm:px-6 z-30 shrink-0">
-          <div className="flex items-center gap-3">
+      {/* Main Workspace Column */}
+      <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden relative z-10">
+        {/* LOCKED TOP HEADER (Rigid 56px height, Responsive Navigation: Icon on Mobile, Icon + Text on Desktop) */}
+        <header
+          className={`h-14 shrink-0 border-b flex items-center justify-between px-3 sm:px-5 z-30 transition-colors ${
+            isDark
+              ? 'bg-[#06080e]/90 backdrop-blur-xl border-white/10 text-white'
+              : 'bg-white/90 backdrop-blur-xl border-slate-200 text-slate-900 shadow-xs'
+          }`}
+        >
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            {/* Mobile Drawer Trigger */}
             <button
               onClick={() => setIsSidebarOpen(true)}
-              className="sm:hidden text-white/60 hover:text-white p-1.5 rounded-lg hover:bg-white/5"
+              className={`sm:hidden p-2 rounded-xl transition cursor-pointer shrink-0 ${
+                isDark ? 'text-white/70 hover:text-white hover:bg-white/10' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+              title="Open Chat Threads"
             >
-              <Menu className="w-5 h-5" />
+              <Menu className="w-5 h-5 text-cyan-500" />
             </button>
 
-            {/* Tab Switcher */}
-            <div className="flex items-center gap-1 bg-black/40 backdrop-blur-xl border border-white/10 p-1 rounded-2xl font-mono text-xs">
+            {/* View Tab Switcher: Mobile (Icons only), Desktop (Icons + Text) */}
+            <nav
+              id="header-nav-menu"
+              className={`flex items-center gap-1 p-1 rounded-xl font-mono text-xs overflow-x-auto no-scrollbar max-w-[240px] sm:max-w-none border ${
+                isDark ? 'bg-black/40 border-white/10' : 'bg-slate-100 border-slate-200'
+              }`}
+            >
               <button
                 id="tab-neural-core"
                 onClick={() => setActiveTab('chat')}
-                className={`px-3 py-1.5 rounded-xl transition-all ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
                   activeTab === 'chat'
-                    ? 'bg-cyan-400/15 text-cyan-200 font-bold border border-cyan-400/40 shadow-[0_0_12px_rgba(34,211,238,0.2)]'
-                    : 'text-white/60 hover:text-white hover:bg-white/5'
+                    ? isDark
+                      ? 'bg-cyan-400/20 text-cyan-200 font-bold border border-cyan-400/40 shadow-[0_0_10px_rgba(34,211,238,0.2)]'
+                      : 'bg-white text-slate-900 font-bold border border-slate-300 shadow-xs'
+                    : isDark
+                    ? 'text-white/60 hover:text-white hover:bg-white/5'
+                    : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/50'
                 }`}
+                title="Neural Core & Chat"
               >
-                Neural Core
+                <Bot className="w-4 h-4 text-cyan-500 shrink-0" />
+                <span className="hidden md:inline">Core</span>
               </button>
 
               <button
                 id="tab-organ-matrix"
                 onClick={() => setActiveTab('matrix')}
-                className={`px-3 py-1.5 rounded-xl transition-all ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
                   activeTab === 'matrix'
-                    ? 'bg-cyan-400/15 text-cyan-200 font-bold border border-cyan-400/40 shadow-[0_0_12px_rgba(34,211,238,0.2)]'
-                    : 'text-white/60 hover:text-white hover:bg-white/5'
+                    ? isDark
+                      ? 'bg-cyan-400/20 text-cyan-200 font-bold border border-cyan-400/40 shadow-[0_0_10px_rgba(34,211,238,0.2)]'
+                      : 'bg-white text-slate-900 font-bold border border-slate-300 shadow-xs'
+                    : isDark
+                    ? 'text-white/60 hover:text-white hover:bg-white/5'
+                    : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/50'
                 }`}
+                title="Neural Organs & Subsystems"
               >
-                Organ Matrix
+                <Cpu className="w-4 h-4 text-cyan-500 shrink-0" />
+                <span className="hidden md:inline">Organs</span>
               </button>
 
               <button
                 id="tab-memory-graph"
                 onClick={() => setActiveTab('memory')}
-                className={`px-3 py-1.5 rounded-xl transition-all ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
                   activeTab === 'memory'
-                    ? 'bg-cyan-400/15 text-cyan-200 font-bold border border-cyan-400/40 shadow-[0_0_12px_rgba(34,211,238,0.2)]'
-                    : 'text-white/60 hover:text-white hover:bg-white/5'
+                    ? isDark
+                      ? 'bg-cyan-400/20 text-cyan-200 font-bold border border-cyan-400/40 shadow-[0_0_10px_rgba(34,211,238,0.2)]'
+                      : 'bg-white text-slate-900 font-bold border border-slate-300 shadow-xs'
+                    : isDark
+                    ? 'text-white/60 hover:text-white hover:bg-white/5'
+                    : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/50'
                 }`}
+                title="FAISS Vector Index & Graph"
               >
-                FAISS Memory
+                <Database className="w-4 h-4 text-cyan-500 shrink-0" />
+                <span className="hidden md:inline">FAISS</span>
               </button>
 
               <button
                 id="tab-autonomy-curiosity"
                 onClick={() => setActiveTab('autonomy')}
-                className={`px-3 py-1.5 rounded-xl transition-all ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
                   activeTab === 'autonomy'
-                    ? 'bg-cyan-400/15 text-cyan-200 font-bold border border-cyan-400/40 shadow-[0_0_12px_rgba(34,211,238,0.2)]'
-                    : 'text-white/60 hover:text-white hover:bg-white/5'
+                    ? isDark
+                      ? 'bg-cyan-400/20 text-cyan-200 font-bold border border-cyan-400/40 shadow-[0_0_10px_rgba(34,211,238,0.2)]'
+                      : 'bg-white text-slate-900 font-bold border border-slate-300 shadow-xs'
+                    : isDark
+                    ? 'text-white/60 hover:text-white hover:bg-white/5'
+                    : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/50'
                 }`}
+                title="Curiosity & Evolution Goals"
               >
-                Curiosity
+                <Compass className="w-4 h-4 text-cyan-500 shrink-0" />
+                <span className="hidden md:inline">Curiosity</span>
               </button>
 
               <button
                 id="tab-python-hub"
                 onClick={() => setActiveTab('code')}
-                className={`px-3 py-1.5 rounded-xl transition-all ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
                   activeTab === 'code'
-                    ? 'bg-cyan-400/15 text-cyan-200 font-bold border border-cyan-400/40 shadow-[0_0_12px_rgba(34,211,238,0.2)]'
-                    : 'text-white/60 hover:text-white hover:bg-white/5'
+                    ? isDark
+                      ? 'bg-cyan-400/20 text-cyan-200 font-bold border border-cyan-400/40 shadow-[0_0_10px_rgba(34,211,238,0.2)]'
+                      : 'bg-white text-slate-900 font-bold border border-slate-300 shadow-xs'
+                    : isDark
+                    ? 'text-white/60 hover:text-white hover:bg-white/5'
+                    : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/50'
                 }`}
+                title="Python Repository & Exporter"
               >
-                Python Hub
+                <Code className="w-4 h-4 text-cyan-500 shrink-0" />
+                <span className="hidden md:inline">Code</span>
               </button>
-            </div>
+            </nav>
           </div>
 
-          {/* Right Controls (Telemetry & CLI Terminal) */}
-          <div className="flex items-center gap-4 font-mono">
-            <div className="hidden lg:flex items-center gap-4 text-[10px] tracking-tighter uppercase text-white/50">
-              <div>LATENCY: <span className="text-cyan-400 font-semibold">{telemetry.avgLatencyMs}ms</span></div>
-              <div>RAM: <span className="text-cyan-400 font-semibold">1.8GB / 8GB</span></div>
-              <div>STATE: <span className="text-green-400 font-semibold">OFFLINE_ACTIVE</span></div>
+          {/* Right Header Controls */}
+          <div className="flex items-center gap-2 sm:gap-4 font-mono shrink-0">
+            {/* Desktop Telemetry Stats */}
+            <div
+              className={`hidden lg:flex items-center gap-3 text-[10px] tracking-tighter uppercase ${
+                isDark ? 'text-white/50' : 'text-slate-500'
+              }`}
+            >
+              <div>LATENCY: <span className="text-cyan-500 font-semibold">{telemetry.avgLatencyMs}ms</span></div>
+              <div>RAM: <span className="text-cyan-500 font-semibold">1.8GB</span></div>
             </div>
 
+            {/* Virtual CLI Terminal Window Trigger */}
             <button
               onClick={() => setIsCLIModalOpen(true)}
-              className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-cyan-400/40 rounded-xl text-cyan-300 text-xs flex items-center gap-1.5 transition shadow-sm backdrop-blur-xl"
-              title="Open Virtual CLI Terminal"
+              className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer border ${
+                isDark
+                  ? 'bg-white/5 hover:bg-white/10 border-white/10 hover:border-cyan-400/40 text-cyan-300'
+                  : 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-800'
+              }`}
+              title="Open Virtual CLI Terminal Window"
             >
-              <Terminal className="w-3.5 h-3.5 text-cyan-400" />
+              <Terminal className="w-3.5 h-3.5 text-cyan-500" />
               <span className="hidden sm:inline">CLI Trace</span>
             </button>
           </div>
         </header>
 
-        {/* Viewport Content */}
-        <main className="flex-1 overflow-hidden relative">
+        {/* VIEWPORT (Fills all space between Locked Header & Locked Footer) */}
+        <main className="flex-1 min-h-0 overflow-hidden relative">
           {activeTab === 'chat' && (
-            <div className="flex flex-col h-full overflow-hidden">
-              {messages.length <= 1 ? (
-                <div className="flex flex-col h-full">
-                  <div className="flex-1 overflow-y-auto flex items-center justify-center p-4">
-                    <OrganismCore
-                      telemetry={telemetry}
-                      onOpenCLI={() => setIsCLIModalOpen(true)}
-                      onQuickPrompt={handleSendMessage}
-                    />
-                  </div>
-                  <NeuralChat
-                    messages={messages}
-                    isThinking={isThinking}
-                    onSendMessage={handleSendMessage}
-                    onOpenCLI={() => setIsCLIModalOpen(true)}
-                  />
-                </div>
-              ) : (
-                <NeuralChat
-                  messages={messages}
-                  isThinking={isThinking}
-                  onSendMessage={handleSendMessage}
-                  onOpenCLI={() => setIsCLIModalOpen(true)}
-                />
-              )}
-            </div>
+            <NeuralChat
+              messages={currentSessionMessages}
+              isThinking={isThinking}
+              onSendMessage={handleSendMessage}
+              onOpenCLI={() => setIsCLIModalOpen(true)}
+              telemetry={telemetry}
+              onQuickPrompt={handleSendMessage}
+              onClearChat={currentSessionMessages.length > 0 ? handleClearCurrentChat : undefined}
+              theme={theme}
+            />
           )}
 
           {activeTab === 'matrix' && (
@@ -507,6 +798,7 @@ export function App() {
               beatCount={telemetry.beatCount}
               bpm={telemetry.bpm}
               onTriggerPulse={handleStimulatePulse}
+              theme={theme}
             />
           )}
 
@@ -515,6 +807,7 @@ export function App() {
               engrams={engrams}
               onAddEngram={handleAddEngram}
               onDeleteEngram={handleDeleteEngram}
+              theme={theme}
             />
           )}
 
@@ -523,24 +816,46 @@ export function App() {
               goals={goals}
               proposals={proposals}
               onTriggerCuriosity={handleTriggerCuriosity}
+              theme={theme}
             />
           )}
 
-          {activeTab === 'code' && <PythonCodeHub />}
+          {activeTab === 'code' && <PythonCodeHub theme={theme} />}
         </main>
 
-        {/* Status bar footer */}
-        <footer className="h-9 border-t border-white/10 bg-black/40 backdrop-blur-md px-6 flex items-center justify-between text-[9px] font-mono text-white/40 shrink-0">
-          <div>ANDROID_ENV: ARM64_TERMUx | 8GB_INSTALLED | SNAPDRAGON_QWEN_OPTIMIZED</div>
-          <div>JARVIS_ORGANISM_SOUL // LATENCY_OPTIMIZED</div>
+        {/* LOCKED BOTTOM FOOTER (Rigid 32px height) */}
+        <footer
+          className={`h-8 shrink-0 border-t px-3 sm:px-6 flex items-center justify-between text-[9px] sm:text-[10px] font-mono z-20 transition-colors ${
+            isDark
+              ? 'bg-[#06080e] border-white/10 text-white/40'
+              : 'bg-white border-slate-200 text-slate-500 shadow-xs'
+          }`}
+        >
+          <div className="truncate">ANDROID_ENV: ARM64_TERMUX &bull; SNAPDRAGON 8GB</div>
+          <div className="truncate shrink-0 ml-2 font-medium text-cyan-500">QWEN 3B &bull; 4 THREADS</div>
         </footer>
       </div>
 
-      {/* Live CLI Terminal Diagnostics Modal */}
+      {/* Session Context Menu / Bottom Sheet Modal */}
+      <SessionActionSheet
+        session={actionSheetSession}
+        isOpen={isActionSheetOpen}
+        onClose={() => {
+          setIsActionSheetOpen(false);
+          setActionSheetSession(null);
+        }}
+        onPinToggle={handlePinSession}
+        onRename={handleRenameSession}
+        onDelete={handleDeleteSession}
+        theme={theme}
+      />
+
+      {/* Virtual CLI Terminal Window (Right-side docked / floating window) */}
       <DiagnosticsModal
         isOpen={isCLIModalOpen}
         onClose={() => setIsCLIModalOpen(false)}
         beatCount={telemetry.beatCount}
+        theme={theme}
       />
     </div>
   );

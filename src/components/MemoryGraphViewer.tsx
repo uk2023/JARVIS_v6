@@ -13,18 +13,20 @@ import {
   Share2,
   CheckCircle2,
 } from 'lucide-react';
-import { EngramFact } from '../types';
+import { EngramFact, AppTheme } from '../types';
 
 interface MemoryGraphViewerProps {
   engrams: EngramFact[];
   onAddEngram: (fact: { subject: string; predicate: string; value: string; tags: string[] }) => void;
   onDeleteEngram: (id: string) => void;
+  theme?: AppTheme;
 }
 
 export const MemoryGraphViewer: React.FC<MemoryGraphViewerProps> = ({
   engrams,
   onAddEngram,
   onDeleteEngram,
+  theme = 'dark',
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [similarityThreshold, setSimilarityThreshold] = useState(0.5);
@@ -34,6 +36,8 @@ export const MemoryGraphViewer: React.FC<MemoryGraphViewerProps> = ({
   const [newVal, setNewVal] = useState('');
   const [newTags, setNewTags] = useState('');
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
+
+  const isDark = theme === 'dark';
 
   // Filter engrams based on query
   const filteredEngrams = engrams.filter(k => {
@@ -74,29 +78,52 @@ export const MemoryGraphViewer: React.FC<MemoryGraphViewerProps> = ({
   };
 
   return (
-    <div id="memory-graph-view" className="h-full overflow-y-auto p-4 sm:p-6 max-w-5xl mx-auto space-y-6">
+    <div
+      id="memory-graph-view"
+      className="h-full overflow-y-auto p-4 sm:p-6 max-w-5xl mx-auto space-y-6 select-text"
+    >
       {/* Header & Stats Banner */}
-      <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-5 shadow-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div
+        className={`border rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-colors ${
+          isDark
+            ? 'bg-[#0b0e17]/80 backdrop-blur-2xl border-white/10 shadow-2xl'
+            : 'bg-white border-slate-200/90 shadow-sm'
+        }`}
+      >
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_#22d3ee]"></div>
-            <h2 className="text-sm sm:text-base font-bold text-cyan-50 tracking-widest uppercase font-mono">
+            <div className="w-2.5 h-2.5 rounded-full bg-cyan-500 animate-pulse shadow-[0_0_8px_#22d3ee]"></div>
+            <h2
+              className={`text-sm sm:text-base font-bold tracking-widest uppercase font-mono ${
+                isDark ? 'text-cyan-50' : 'text-slate-900'
+              }`}
+            >
               SEMANTIC MEMORY & FAISS VECTOR STORE
             </h2>
           </div>
-          <p className="text-xs text-white/50 font-mono">
+          <p className={`text-xs font-mono ${isDark ? 'text-white/60' : 'text-slate-500'}`}>
             384-dimensional ONNX Embedding Index & NetworkX Directed Knowledge Graph
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="bg-black/40 backdrop-blur-xl border border-white/10 px-3.5 py-1.5 rounded-xl font-mono text-xs text-cyan-200">
-            <span className="text-white/40">ACTIVE ENGRAMS: </span>
-            <span className="font-bold text-cyan-300">{engrams.length}</span>
+          <div
+            className={`border px-3.5 py-1.5 rounded-xl font-mono text-xs ${
+              isDark
+                ? 'bg-black/40 backdrop-blur-xl border-white/10 text-cyan-200'
+                : 'bg-slate-100 border-slate-200 text-slate-800'
+            }`}
+          >
+            <span className={isDark ? 'text-white/40' : 'text-slate-500'}>ACTIVE ENGRAMS: </span>
+            <span className="font-bold text-cyan-600 dark:text-cyan-300">{engrams.length}</span>
           </div>
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-3.5 py-1.5 bg-cyan-400/15 hover:bg-cyan-400/25 text-cyan-200 border border-cyan-400/40 rounded-xl text-xs font-semibold font-mono flex items-center gap-1.5 transition shadow-[0_0_12px_rgba(34,211,238,0.2)] cursor-pointer"
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold font-mono flex items-center gap-1.5 transition cursor-pointer ${
+              isDark
+                ? 'bg-cyan-400/15 hover:bg-cyan-400/25 text-cyan-200 border border-cyan-400/40 shadow-[0_0_12px_rgba(34,211,238,0.2)]'
+                : 'bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-300 shadow-sm'
+            }`}
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add Triple</span>
@@ -105,12 +132,22 @@ export const MemoryGraphViewer: React.FC<MemoryGraphViewerProps> = ({
       </div>
 
       {/* Interactive Visual Relational Node Map */}
-      <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-5 shadow-2xl space-y-4">
+      <div
+        className={`border rounded-2xl p-5 shadow-sm space-y-4 transition-colors ${
+          isDark
+            ? 'bg-[#0f121d]/80 backdrop-blur-2xl border-white/10 shadow-2xl'
+            : 'bg-white border-slate-200/90 shadow-sm'
+        }`}
+      >
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-bold text-cyan-300 font-mono flex items-center gap-2 uppercase tracking-wider">
-            <Share2 className="w-4 h-4 text-cyan-400" /> Relational Knowledge Graph Nodes
+          <h3
+            className={`text-xs font-bold font-mono flex items-center gap-2 uppercase tracking-wider ${
+              isDark ? 'text-cyan-300' : 'text-cyan-700'
+            }`}
+          >
+            <Share2 className="w-4 h-4 text-cyan-500 dark:text-cyan-400" /> Relational Knowledge Graph Nodes
           </h3>
-          <span className="text-[10px] text-white/40 font-mono">
+          <span className={`text-[10px] font-mono ${isDark ? 'text-white/40' : 'text-slate-400'}`}>
             {distinctSubjects.length} Root Subjects &bull; {engrams.length} Edges
           </span>
         </div>
@@ -121,8 +158,12 @@ export const MemoryGraphViewer: React.FC<MemoryGraphViewerProps> = ({
             onClick={() => setSelectedSubject(null)}
             className={`px-3 py-1.5 rounded-xl font-mono text-xs transition border cursor-pointer ${
               selectedSubject === null
-                ? 'bg-cyan-400/20 text-cyan-200 border-cyan-400/50 font-bold shadow-[0_0_10px_rgba(34,211,238,0.2)]'
-                : 'bg-black/30 text-white/50 border-white/10 hover:text-white hover:bg-white/5'
+                ? isDark
+                  ? 'bg-cyan-400/20 text-cyan-200 border-cyan-400/50 font-bold shadow-[0_0_10px_rgba(34,211,238,0.2)]'
+                  : 'bg-slate-900 text-white border-slate-900 font-bold shadow-sm'
+                : isDark
+                ? 'bg-black/30 text-white/50 border-white/10 hover:text-white hover:bg-white/5'
+                : 'bg-slate-100 text-slate-600 border-slate-200 hover:text-slate-900 hover:bg-slate-200'
             }`}
           >
             All Subjects ({engrams.length})
@@ -136,11 +177,15 @@ export const MemoryGraphViewer: React.FC<MemoryGraphViewerProps> = ({
                 onClick={() => setSelectedSubject(isSelected ? null : sub)}
                 className={`px-3 py-1.5 rounded-xl font-mono text-xs transition border flex items-center gap-1.5 cursor-pointer ${
                   isSelected
-                    ? 'bg-cyan-400/20 text-cyan-200 border-cyan-400/50 font-bold shadow-[0_0_10px_rgba(34,211,238,0.2)]'
-                    : 'bg-black/30 text-white/50 border-white/10 hover:text-white hover:bg-white/5'
+                    ? isDark
+                      ? 'bg-cyan-400/20 text-cyan-200 border-cyan-400/50 font-bold shadow-[0_0_10px_rgba(34,211,238,0.2)]'
+                      : 'bg-slate-900 text-white border-slate-900 font-bold shadow-sm'
+                    : isDark
+                    ? 'bg-black/30 text-white/50 border-white/10 hover:text-white hover:bg-white/5'
+                    : 'bg-slate-100 text-slate-600 border-slate-200 hover:text-slate-900 hover:bg-slate-200'
                 }`}
               >
-                <GitFork className="w-3 h-3 text-cyan-400" />
+                <GitFork className="w-3 h-3 text-cyan-500 dark:text-cyan-400" />
                 <span>{sub}</span>
                 <span className="text-[10px] opacity-70">({count})</span>
               </button>
@@ -155,23 +200,39 @@ export const MemoryGraphViewer: React.FC<MemoryGraphViewerProps> = ({
             .map(e => (
               <div
                 key={e.id}
-                className="bg-black/40 backdrop-blur-xl border border-white/10 hover:border-cyan-400/40 p-3.5 rounded-2xl text-xs font-mono space-y-2 shadow-xl transition"
+                className={`border p-3.5 rounded-2xl text-xs font-mono space-y-2 transition ${
+                  isDark
+                    ? 'bg-black/40 backdrop-blur-xl border-white/10 hover:border-cyan-400/40 shadow-xl'
+                    : 'bg-slate-50 border-slate-200 hover:border-cyan-400 shadow-sm'
+                }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-cyan-300 font-bold text-xs">({e.subject})</span>
-                  <span className="text-white/40 text-[10px]">FAISS #{e.faissId}</span>
+                  <span className="text-cyan-600 dark:text-cyan-300 font-bold text-xs">({e.subject})</span>
+                  <span className={`text-[10px] ${isDark ? 'text-white/40' : 'text-slate-400'}`}>
+                    FAISS #{e.faissId}
+                  </span>
                 </div>
 
-                <div className="pl-3 border-l-2 border-cyan-400/40 text-white/80 space-y-1">
-                  <div className="text-cyan-200 font-semibold text-[11px]">
+                <div className="pl-3 border-l-2 border-cyan-500/40 space-y-1">
+                  <div className={`font-semibold text-[11px] ${isDark ? 'text-cyan-200' : 'text-cyan-800'}`}>
                     ──[ <span className="underline decoration-cyan-400/50">{e.predicate}</span> ]──&gt;
                   </div>
-                  <div className="text-white text-xs bg-cyan-400/10 p-2.5 rounded-xl border border-cyan-400/20 break-words">
+                  <div
+                    className={`text-xs p-2.5 rounded-xl border break-words ${
+                      isDark
+                        ? 'text-white bg-cyan-400/10 border-cyan-400/20'
+                        : 'text-slate-900 bg-white border-slate-200 shadow-xs'
+                    }`}
+                  >
                     {String(e.value)}
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-[10px] text-white/40 pt-1 border-t border-white/5">
+                <div
+                  className={`flex items-center justify-between text-[10px] pt-1 border-t ${
+                    isDark ? 'text-white/40 border-white/5' : 'text-slate-500 border-slate-200'
+                  }`}
+                >
                   <span>Confidence: {(e.confidence * 100).toFixed(0)}%</span>
                   <span>Evidences: {e.evidenceCount}</span>
                 </div>
@@ -181,16 +242,26 @@ export const MemoryGraphViewer: React.FC<MemoryGraphViewerProps> = ({
       </div>
 
       {/* FAISS Vector Search Playground */}
-      <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-5 shadow-2xl space-y-4">
+      <div
+        className={`border rounded-2xl p-5 shadow-sm space-y-4 transition-colors ${
+          isDark
+            ? 'bg-[#0f121d]/80 backdrop-blur-2xl border-white/10 shadow-2xl'
+            : 'bg-white border-slate-200/90 shadow-sm'
+        }`}
+      >
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2 font-mono text-xs font-bold text-cyan-300 uppercase tracking-wider">
-            <Search className="w-4 h-4 text-cyan-400" />
+          <div
+            className={`flex items-center gap-2 font-mono text-xs font-bold uppercase tracking-wider ${
+              isDark ? 'text-cyan-300' : 'text-cyan-700'
+            }`}
+          >
+            <Search className="w-4 h-4 text-cyan-500 dark:text-cyan-400" />
             <span>Hybrid Search & Cosine Threshold Sandbox</span>
           </div>
 
           <div className="flex items-center gap-3 w-full sm:w-auto">
-            <div className="flex items-center gap-2 font-mono text-xs text-white/50">
-              <Sliders className="w-3.5 h-3.5 text-cyan-400" />
+            <div className={`flex items-center gap-2 font-mono text-xs ${isDark ? 'text-white/60' : 'text-slate-600'}`}>
+              <Sliders className="w-3.5 h-3.5 text-cyan-500 dark:text-cyan-400" />
               <span>Threshold: {similarityThreshold}</span>
             </div>
             <input
@@ -200,19 +271,23 @@ export const MemoryGraphViewer: React.FC<MemoryGraphViewerProps> = ({
               step="0.05"
               value={similarityThreshold}
               onChange={e => setSimilarityThreshold(parseFloat(e.target.value))}
-              className="accent-cyan-400 w-28 cursor-pointer"
+              className="accent-cyan-500 w-28 cursor-pointer"
             />
           </div>
         </div>
 
         <div className="relative">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+          <Search className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 ${isDark ? 'text-white/40' : 'text-slate-400'}`} />
           <input
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Type query to test vector recall (e.g. 'earphone mic', 'ex partner', 'model name')..."
-            className="w-full bg-black/40 backdrop-blur-xl border border-white/10 focus:border-cyan-400 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-white/40 font-mono outline-none shadow-inner transition"
+            className={`w-full border rounded-xl pl-10 pr-4 py-2.5 text-xs font-mono outline-none transition ${
+              isDark
+                ? 'bg-black/40 backdrop-blur-xl border-white/10 focus:border-cyan-400 text-white placeholder-white/40 shadow-inner'
+                : 'bg-slate-50 border-slate-300 focus:border-cyan-500 text-slate-900 placeholder-slate-400'
+            }`}
           />
         </div>
 
@@ -220,7 +295,11 @@ export const MemoryGraphViewer: React.FC<MemoryGraphViewerProps> = ({
         <div className="overflow-x-auto">
           <table className="w-full text-left font-mono text-xs border-collapse">
             <thead>
-              <tr className="border-b border-white/10 text-white/40 text-[10px] uppercase">
+              <tr
+                className={`border-b text-[10px] uppercase ${
+                  isDark ? 'border-white/10 text-white/40' : 'border-slate-200 text-slate-500'
+                }`}
+              >
                 <th className="py-2.5 px-3">Subject</th>
                 <th className="py-2.5 px-3">Predicate</th>
                 <th className="py-2.5 px-3">Value / Target</th>
@@ -228,21 +307,32 @@ export const MemoryGraphViewer: React.FC<MemoryGraphViewerProps> = ({
                 <th className="py-2.5 px-3 text-center">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5">
+            <tbody className={`divide-y ${isDark ? 'divide-white/5' : 'divide-slate-100'}`}>
               {filteredEngrams.map(item => (
-                <tr key={item.id} className="hover:bg-white/5 transition">
-                  <td className="py-3 px-3 text-cyan-300 font-bold">{item.subject}</td>
-                  <td className="py-3 px-3 text-cyan-100">{item.predicate}</td>
-                  <td className="py-3 px-3 text-white max-w-xs truncate">{String(item.value)}</td>
+                <tr
+                  key={item.id}
+                  className={`transition ${isDark ? 'hover:bg-white/5' : 'hover:bg-slate-50'}`}
+                >
+                  <td className="py-3 px-3 text-cyan-600 dark:text-cyan-300 font-bold">{item.subject}</td>
+                  <td className={`py-3 px-3 ${isDark ? 'text-cyan-100' : 'text-slate-700'}`}>{item.predicate}</td>
+                  <td className={`py-3 px-3 max-w-xs truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                    {String(item.value)}
+                  </td>
                   <td className="py-3 px-3 text-center">
-                    <span className="px-2 py-0.5 rounded-lg bg-green-400/10 text-green-400 border border-green-400/30 text-[10px]">
+                    <span
+                      className={`px-2 py-0.5 rounded-lg text-[10px] border ${
+                        isDark
+                          ? 'bg-green-400/10 text-green-400 border-green-400/30'
+                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      }`}
+                    >
                       {(item.confidence * 100).toFixed(0)}%
                     </span>
                   </td>
                   <td className="py-3 px-3 text-center">
                     <button
                       onClick={() => onDeleteEngram(item.id)}
-                      className="text-red-400 hover:text-red-300 p-1.5 rounded-lg hover:bg-red-500/10 transition cursor-pointer"
+                      className="text-red-500 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-500/10 transition cursor-pointer"
                       title="Forget engram"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -261,68 +351,106 @@ export const MemoryGraphViewer: React.FC<MemoryGraphViewerProps> = ({
           <motion.div
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="bg-[#050508]/90 backdrop-blur-2xl border border-white/20 rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4"
+            className={`border rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4 ${
+              isDark
+                ? 'bg-[#050508]/95 backdrop-blur-2xl border-white/20 text-white'
+                : 'bg-white border-slate-300 text-slate-900'
+            }`}
           >
-            <h3 className="text-sm font-bold text-cyan-50 font-mono flex items-center gap-2 uppercase tracking-wider">
-              <Plus className="w-4 h-4 text-cyan-400" /> Add Semantic Memory Triple
+            <h3
+              className={`text-sm font-bold font-mono flex items-center gap-2 uppercase tracking-wider ${
+                isDark ? 'text-cyan-50' : 'text-slate-900'
+              }`}
+            >
+              <Plus className="w-4 h-4 text-cyan-500 dark:text-cyan-400" /> Add Semantic Memory Triple
             </h3>
 
             <form onSubmit={handleAddSubmit} className="space-y-3 font-mono text-xs">
               <div>
-                <label className="text-white/50 text-[10px] block mb-1">Subject Node (e.g. 'user', 'project')</label>
+                <label className={`text-[10px] block mb-1 ${isDark ? 'text-white/50' : 'text-slate-500'}`}>
+                  Subject Node (e.g. 'user', 'project')
+                </label>
                 <input
                   type="text"
                   required
                   value={newSub}
                   onChange={e => setNewSub(e.target.value)}
-                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-white outline-none focus:border-cyan-400"
+                  className={`w-full border rounded-xl px-3 py-2 outline-none ${
+                    isDark
+                      ? 'bg-black/40 border-white/10 text-white focus:border-cyan-400'
+                      : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-cyan-500'
+                  }`}
                 />
               </div>
 
               <div>
-                <label className="text-white/50 text-[10px] block mb-1">Predicate Relation (e.g. 'favorite_tool')</label>
+                <label className={`text-[10px] block mb-1 ${isDark ? 'text-white/50' : 'text-slate-500'}`}>
+                  Predicate Relation (e.g. 'favorite_tool')
+                </label>
                 <input
                   type="text"
                   required
                   value={newPred}
                   onChange={e => setNewPred(e.target.value)}
-                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-white outline-none focus:border-cyan-400"
+                  className={`w-full border rounded-xl px-3 py-2 outline-none ${
+                    isDark
+                      ? 'bg-black/40 border-white/10 text-white focus:border-cyan-400'
+                      : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-cyan-500'
+                  }`}
                 />
               </div>
 
               <div>
-                <label className="text-white/50 text-[10px] block mb-1">Value / Fact (e.g. 'VS Code & MT Manager')</label>
+                <label className={`text-[10px] block mb-1 ${isDark ? 'text-white/50' : 'text-slate-500'}`}>
+                  Value / Fact (e.g. 'VS Code & MT Manager')
+                </label>
                 <textarea
                   rows={2}
                   required
                   value={newVal}
                   onChange={e => setNewVal(e.target.value)}
-                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-white outline-none focus:border-cyan-400 resize-none"
+                  className={`w-full border rounded-xl px-3 py-2 outline-none resize-none ${
+                    isDark
+                      ? 'bg-black/40 border-white/10 text-white focus:border-cyan-400'
+                      : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-cyan-500'
+                  }`}
                 />
               </div>
 
               <div>
-                <label className="text-white/50 text-[10px] block mb-1">Tags (Comma-separated)</label>
+                <label className={`text-[10px] block mb-1 ${isDark ? 'text-white/50' : 'text-slate-500'}`}>
+                  Tags (Comma-separated)
+                </label>
                 <input
                   type="text"
                   value={newTags}
                   onChange={e => setNewTags(e.target.value)}
                   placeholder="editor, tools, coding"
-                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-white outline-none focus:border-cyan-400"
+                  className={`w-full border rounded-xl px-3 py-2 outline-none ${
+                    isDark
+                      ? 'bg-black/40 border-white/10 text-white focus:border-cyan-400'
+                      : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-cyan-500'
+                  }`}
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-white/10">
+              <div className={`flex justify-end gap-2 pt-3 border-t ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 rounded-xl text-white/60 hover:text-white transition"
+                  className={`px-4 py-2 rounded-xl transition ${
+                    isDark ? 'text-white/60 hover:text-white' : 'text-slate-500 hover:text-slate-800'
+                  }`}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-cyan-400 hover:bg-cyan-300 text-black font-bold rounded-xl transition shadow-[0_0_10px_#22d3ee] cursor-pointer"
+                  className={`px-4 py-2 font-bold rounded-xl transition cursor-pointer shadow-md ${
+                    isDark
+                      ? 'bg-cyan-400 hover:bg-cyan-300 text-black shadow-[0_0_10px_#22d3ee]'
+                      : 'bg-slate-900 hover:bg-slate-800 text-white'
+                  }`}
                 >
                   Save Engram
                 </button>
